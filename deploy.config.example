@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# 示例配置文件 deploy.config
+# 将此文件复制为 deploy.config 并根据您的环境修改值
+
+# 项目目录路径
+PROJECT_DIR="/path/to/your/nextjs/project"
+
+# 项目名称（用于镜像命名）
+PROJECT_NAME="my-nextjs-app"
+
+# 构建命令
+BUILD_COMMAND="yarn build"
+
+# 远程服务器地址 (user@host)
+REMOTE_HOST="user@server.com"
+
+# 远程服务器镜像目录
+REMOTE_IMAGE_DIR="/home/user/images"
+
+# 远程服务器 Docker Compose 目录
+REMOTE_COMPOSE_DIR="/home/user/compose"
+
+# 包管理器 (yarn|npm|pnpm) - 可选，留空则自动检测
+PACKAGE_MANAGER=""
+
+# 日志保存目录 - 可选，默认不保存日志到文件
+LOG_DIR="/var/log/deploy"

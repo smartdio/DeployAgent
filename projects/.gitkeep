@@ -1,0 +1,3 @@
+# 此文件用于保持 projects 目录在 git 中被跟踪
+# 用户可以在此目录中创建自己的 .config 文件
+# .config 文件会被 .gitignore 忽略以保护敏感信息
