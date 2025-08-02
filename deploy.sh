@@ -15,6 +15,7 @@ REMOTE_COMPOSE_DIR=""
 PACKAGE_MANAGER=""
 LOG_DIR=""
 CONFIG_FILE=""
+SKIP_INSTALL=false
 
 # 全局变量
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -74,6 +75,7 @@ OPTIONS:
     -l, --log-dir DIR           日志保存目录
     -m, --package-manager PM    包管理器 (yarn|npm|pnpm) [可选]
     -f, --config-file FILE      配置文件路径
+    --skip-install              跳过依赖安装步骤
     --help                      显示此帮助信息
 
 EXAMPLES:
@@ -81,6 +83,8 @@ EXAMPLES:
                 -i "/home/user/images" -d "/home/user/compose" -l "/var/log/deploy"
     
     ./deploy.sh -f "./deploy.config"
+    
+    ./deploy.sh -f "./deploy.config" --skip-install  # 跳过依赖安装
 
 EOF
 }
@@ -124,6 +128,10 @@ parse_args() {
             -f|--config-file)
                 CONFIG_FILE="$2"
                 shift 2
+                ;;
+            --skip-install)
+                SKIP_INSTALL=true
+                shift
                 ;;
             --help)
                 show_help
@@ -277,6 +285,78 @@ load_config_file() {
     fi
 }
 
+# 安装项目依赖
+install_dependencies() {
+    log "开始安装项目依赖..."
+    
+    # 进入项目目录
+    cd "$PROJECT_DIR"
+    
+    # 检查 package.json 是否存在
+    if [[ ! -f "package.json" ]]; then
+        log_warn "未找到 package.json 文件，跳过依赖安装"
+        return
+    fi
+    
+    # 检查包管理器是否已安装
+    if ! command -v "$PACKAGE_MANAGER" >/dev/null 2>&1; then
+        log_error "包管理器 $PACKAGE_MANAGER 未安装或不在 PATH 中"
+        exit 1
+    fi
+    
+    # 根据包管理器类型执行安装命令
+    local install_command=""
+    case $PACKAGE_MANAGER in
+        yarn)
+            # 检查是否有 yarn.lock，决定使用哪个安装命令
+            if [[ -f "yarn.lock" ]]; then
+                install_command="yarn install --frozen-lockfile"
+                log_info "发现 yarn.lock，使用 frozen-lockfile 模式安装"
+            else
+                install_command="yarn install"
+                log_info "未发现 yarn.lock，使用普通模式安装"
+            fi
+            ;;
+        npm)
+            # 检查是否有 package-lock.json，决定使用哪个安装命令
+            if [[ -f "package-lock.json" ]]; then
+                install_command="npm ci"
+                log_info "发现 package-lock.json，使用 npm ci 安装"
+            else
+                install_command="npm install"
+                log_info "未发现 package-lock.json，使用 npm install"
+            fi
+            ;;
+        pnpm)
+            # 检查是否有 pnpm-lock.yaml，决定使用哪个安装命令
+            if [[ -f "pnpm-lock.yaml" ]]; then
+                install_command="pnpm install --frozen-lockfile"
+                log_info "发现 pnpm-lock.yaml，使用 frozen-lockfile 模式安装"
+            else
+                install_command="pnpm install"
+                log_info "未发现 pnpm-lock.yaml，使用普通模式安装"
+            fi
+            ;;
+        *)
+            log_error "不支持的包管理器: $PACKAGE_MANAGER"
+            exit 1
+            ;;
+    esac
+    
+    log "执行依赖安装命令: $install_command"
+    
+    # 显示安装进度
+    local start_time=$(date +%s)
+    if ! eval "$install_command"; then
+        log_error "依赖安装失败"
+        exit 1
+    fi
+    local end_time=$(date +%s)
+    local duration=$((end_time - start_time))
+    
+    log "项目依赖安装完成 (耗时: ${duration}秒)"
+}
+
 # 执行编译步骤
 execute_build() {
     log "开始执行项目编译..."
@@ -284,8 +364,15 @@ execute_build() {
     # 进入项目目录
     cd "$PROJECT_DIR"
     
+    # 根据配置决定是否安装依赖
+    if [[ "$SKIP_INSTALL" == "false" ]]; then
+        install_dependencies
+    else
+        log_info "跳过依赖安装步骤"
+    fi
+    
     # 执行构建命令
-    log "执行命令: $BUILD_COMMAND"
+    log "执行构建命令: $BUILD_COMMAND"
     if ! eval "$BUILD_COMMAND"; then
         log_error "构建失败"
         exit 1
